@@ -8,7 +8,7 @@ servers and the ssh forwarding agent be active.
 import fabtools
 
 from fabric.api import cd, env, local, parallel, serial
-from fabric.api import put, run, settings, sudo, shell_env
+from fabric.api import put, run, settings, sudo, shell_env, hide
 from fabric.operations import prompt
 from fabric.contrib import files, console
 
@@ -250,6 +250,43 @@ def push_ssh_key(pg_node,
     _push_ssh_key(pg_node, path, genkey)
 
 
+def streaming_info(node, pg_version="9.3"):
+    """ Tells info about streaming replication """
+    with settings(host_string=node), hide("output"):
+
+        fields = [
+            "application_name",
+            "client_addr",
+            "client_hostname",
+            "state",
+            "sent_location",
+            "write_location",
+            "sync_state"
+        ]
+
+        if pg_version != "9.3":
+            fields = ["procpid",] + fields
+        else:
+            fields = ["pid",] + fields
+
+        query = """
+        SELECT %s
+        FROM pg_stat_replication;""" % ','.join(fields)
+        repl_stats = run("su - postgres -c 'psql -A -t -F ',' -c \"%s\"'" % query)
+
+        if repl_stats:
+            print
+            print "Node %s is master of" % node
+            print
+
+            for stats in repl_stats.split("\n"):
+                pid, appname, addr, hostname, state, sent, write, sync = stats.split(',')
+
+                print "Node %s(%s):" % (addr, hostname)
+                print "\tstate: %s\n\tappname: %s\n\tpid: %s\n\twal sent: %s \n\twal written: %s\n\tsync state %s" % (
+                    state, appname, pid, sent, write, sync)
+
+
 def help(topic="intro"):
     """ Print a brief explanation of the program """
     
@@ -348,5 +385,11 @@ def help(topic="intro"):
         print "postgres user credential because the 'promote' command can"
         print "only be issued by the postgres user."
 
+    elif topic == "streaming_info":
+        print "Streaming information"
+        print "====================="
+        print
+        print "This command shows info about a streaming cluster."
+        print "You must provide the master ip."
     else:
         intro()
