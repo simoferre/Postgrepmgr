@@ -20,7 +20,7 @@ env.forward_agent = True
 env.user = "root"
 
 
-def _install_dependencies(what="pg"):
+def _install_dependencies(what="pg", proxy=""):
     """ Configure the debian package system """
 
     post_path = "/etc/apt/sources.list.d/postgresql.list"
@@ -50,7 +50,11 @@ def _install_dependencies(what="pg"):
     if not files.exists(post_path):
         put("conf/deb/postgresql.list", post_path)
 
-    run("wget --quiet -O - %s | apt-key add -" % pg_apt_key)
+    if proxy:
+        with shell_env(http_proxy=proxy):
+            run("wget --quiet -O - %s | apt-key add -" % pg_apt_key)
+    else:
+        run("wget --quiet -O - %s | apt-key add -" % pg_apt_key)
 
     run("apt-get update")
     run("apt-get -y install %s" % ' '.join(packages[what]))
@@ -61,7 +65,8 @@ def _setup_postgres(pg_master,
                     pg_version,
                     cluster_name,
                     cluster_port,
-                    standby):
+                    standby,
+                    proxy):
     """ Set up the postgres m/r """
 
     env.pg_master = pg_master
@@ -88,7 +93,7 @@ def _setup_postgres(pg_master,
     local_recovery_file = "%s/recovery.conf" % pg_local_dir
     pg_recovery_file = "%s/recovery.conf" % lib_dir
 
-    _install_dependencies()
+    _install_dependencies(proxy=proxy)
 
     # Upload the postgresql.conf file
     files.upload_template(
@@ -137,7 +142,8 @@ def _setup_postgres(pg_master,
 def setup_master(pg_master,
                  pg_version="9.3",
                  cluster_name="main",
-                 cluster_port="5432"):
+                 cluster_port="5432",
+                 proxy=""):
     """ Setup the postgres master server """
 
     with settings(host_string=pg_master):
@@ -147,7 +153,8 @@ def setup_master(pg_master,
             pg_version=pg_version,
             cluster_name=cluster_name,
             cluster_port=cluster_port,
-            standby=False
+            standby=False,
+            proxy=proxy
         )
 
 
@@ -155,7 +162,8 @@ def setup_slave(pg_master,
                 pg_slave,
                 pg_version="9.3",
                 cluster_name="main",
-                cluster_port="5432"):
+                cluster_port="5432",
+                proxy=""):
     """ Setup the postgres slave server """
 
     # Copy the pg_hba record in the master to grant access to
@@ -183,7 +191,8 @@ def setup_slave(pg_master,
             pg_version,
             cluster_name,
             cluster_port,
-            standby=True
+            standby=True,
+            proxy=proxy
         )
 
 
