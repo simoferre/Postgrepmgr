@@ -1,7 +1,7 @@
 Postgrepmgr
 ===========
 
-This program help postgres administrator
+This program helps postgres administrator
 to easy build and manage PostgreSQL streaming
 replication and failover.
 
